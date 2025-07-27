@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bill Splitter</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/css/bootstrap.min.css"
+      integrity="sha512-fw7f+TcMjTb7bpbLJZlP8g2Y4XcCyFZW8uy8HsRZsH/SwbMw0plKHFHr99DN3l04VsYNwvzicUX/6qurvIxbxw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css"
+      integrity="sha512-t7Few9xlddEmgd3oKZQahkNI4dS6l80+eGEzFQiqtyVYdvcSG2D3Iub77R20BdotfRPA9caaRkg1tyaJiPmO0g=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+      integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <style>
+      /* Minimal custom styles for specific functionality */
+      #attendee-names-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+      }
+      .split-method-options .form-check {
+        display: inline-block;
+        margin-right: 15px;
+      }
+      .attendee-split-input {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .attendee-split-input label {
+        flex-basis: 50%;
+      }
+      .attendee-split-input input {
+        flex-basis: 45%;
+      }
+      .bill-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .bill-actions button {
+        padding: 5px 10px;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body class="bg-light">
+    <div class="container my-4">
+      <div class="text-primary border-bottom border-primary pb-2 mb-4">
+        <h1>Bill Splitter</h1>
+        <span>Dhesant Nakka</span>
+      </div>
+
+      <!-- Section 1: Attendees -->
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title text-primary h4"><i class="bi bi-people me-2"></i>1. Attendees</h2>
+          <div class="mb-3">
+            <label for="num-attendees" class="form-label fw-bold">Number of Attendees</label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="num-attendees" min="1" value="2" />
+              <button id="set-attendees-btn" class="btn btn-primary">Set</button>
+            </div>
+          </div>
+          <div id="attendee-names-container" class="mt-3"></div>
+        </div>
+      </div>
+
+      <!-- Section 2: Add Bills -->
+      <div id="bill-section" class="card mb-4 shadow-sm" style="display: none">
+        <div class="card-body">
+          <h2 class="card-title text-primary h4"><i class="bi bi-receipt me-2"></i>2. Add a Bill</h2>
+          <form id="add-bill-form">
+            <div class="mb-3">
+              <label for="bill-desc" class="form-label fw-bold">Description (e.g., "Dinner", "Groceries")</label>
+              <input type="text" class="form-control" id="bill-desc" placeholder="Dinner at Pizza Place" required />
+            </div>
+            <div class="mb-3">
+              <label for="bill-amount" class="form-label fw-bold">Total Amount</label>
+              <input
+                type="text"
+                class="form-control"
+                id="bill-amount"
+                inputmode="decimal"
+                placeholder="e.g., 75.50 or 50+25.50"
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label for="payer-select" class="form-label fw-bold">Paid By</label>
+              <select id="payer-select" class="form-select" required></select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Split Method</label>
+              <div class="split-method-options">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="split-method"
+                    value="even"
+                    id="split-even"
+                    checked
+                  />
+                  <label class="form-check-label" for="split-even">Evenly</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="split-method" value="shares" id="split-shares" />
+                  <label class="form-check-label" for="split-shares">By Shares</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="split-method" value="offset" id="split-offset" />
+                  <label class="form-check-label" for="split-offset">By +/- Offset</label>
+                </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="split-method"
+                    value="specific"
+                    id="split-specific"
+                  />
+                  <label class="form-check-label" for="split-specific">By Specific Amounts</label>
+                </div>
+              </div>
+            </div>
+
+            <div id="split-details" class="mb-3"></div>
+
+            <div id="error-message" class="alert alert-danger" style="display: none"></div>
+
+            <button type="submit" id="submit-bill-btn" class="btn btn-primary">
+              <i class="bi bi-plus-circle me-1"></i>Add Bill
+            </button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary ms-2" style="display: none">
+              <i class="bi bi-x-circle me-1"></i>Cancel Edit
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Section 3: Bill & Calculation -->
+      <div id="calculation-section" class="card mb-4 shadow-sm" style="display: none">
+        <div class="card-body">
+          <h2 class="card-title text-primary h4"><i class="bi bi-list-check me-2"></i>3. Bills & Calculation</h2>
+          <div id="bills-list" class="mb-4">
+            <p class="text-muted">No bills added yet.</p>
+          </div>
+
+          <!-- Export/Import Section -->
+          <div class="border rounded p-3 mb-4 bg-light">
+            <h5 class="text-secondary mb-3"><i class="bi bi-gear me-2"></i>Data Management</h5>
+            <div class="d-flex gap-2 flex-wrap">
+              <button id="export-btn" class="btn btn-outline-secondary flex-fill">
+                <i class="bi bi-download me-1"></i>Export Data
+              </button>
+              <button id="import-btn" class="btn btn-outline-secondary flex-fill">
+                <i class="bi bi-upload me-1"></i>Import Data
+              </button>
+              <input type="file" id="import-file" accept=".json" style="display: none" />
+            </div>
+            <p class="small text-secondary mt-2 mb-0">
+              Export saves all attendees and bills as a JSON file. Import loads data from a previously exported file.
+            </p>
+          </div>
+
+          <button id="calculate-btn" class="btn btn-success btn-lg w-100">
+            <i class="bi bi-calculator me-2"></i>Calculate Final Balances
+          </button>
+        </div>
+      </div>
+
+      <!-- Section 4: Results -->
+      <div id="results-output" class="card shadow-sm" style="display: none">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="card-title text-primary h4 mb-0"><i class="bi bi-graph-up me-2"></i>Results</h2>
+            <button id="copy-png-btn" class="btn btn-outline-secondary">
+              <i class="bi bi-clipboard me-1"></i>Copy Results as PNG
+            </button>
+          </div>
+
+          <div id="results-content">
+            <h3 class="h5 text-primary border-bottom border-primary pb-2">Detailed Breakdown</h3>
+            <div id="detailed-table" class="mb-4"></div>
+
+            <h3 class="h5 text-primary border-bottom border-primary pb-2">Payment Plan</h3>
+            <div id="payments-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/js/bootstrap.bundle.min.js"
+      integrity="sha512-Tc0i+vRogmX4NN7tuLbQfBxa8JkfUSAxSFVzmU31nVdHyiHElPPy2cWfFacmCJKw0VqovrzKhdd2TSTMdAxp2g=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // --- STATE ---
+        let attendees = [];
+        let bills = [];
+
+        // --- DOM ELEMENTS ---
+        const setAttendeesBtn = document.getElementById("set-attendees-btn");
+        const numAttendeesInput = document.getElementById("num-attendees");
+        const attendeeNamesContainer = document.getElementById("attendee-names-container");
+        const billSection = document.getElementById("bill-section");
+        const calculationSection = document.getElementById("calculation-section");
+        const addBillForm = document.getElementById("add-bill-form");
+        const payerSelect = document.getElementById("payer-select");
+        const splitMethodRadios = document.querySelectorAll('input[name="split-method"]');
+        const splitDetailsContainer = document.getElementById("split-details");
+        const billsListContainer = document.getElementById("bills-list");
+        const calculateBtn = document.getElementById("calculate-btn");
+        const resultsOutput = document.getElementById("results-output");
+        const paymentsList = document.getElementById("payments-list");
+        const errorMessage = document.getElementById("error-message");
+        const submitBillBtn = document.getElementById("submit-bill-btn");
+        const cancelEditBtn = document.getElementById("cancel-edit-btn");
+        const detailedTable = document.getElementById("detailed-table");
+        const copyPngBtn = document.getElementById("copy-png-btn");
+        const exportBtn = document.getElementById("export-btn");
+        const importBtn = document.getElementById("import-btn");
+        const importFile = document.getElementById("import-file");
+
+        // --- EDIT STATE ---
+        let editingBillId = null;
+
+        // --- EVENT LISTENERS ---
+        setAttendeesBtn.addEventListener("click", setupAttendeeInputs);
+        attendeeNamesContainer.addEventListener("input", handleAttendeeNameChange);
+        addBillForm.addEventListener("submit", handleAddBill);
+        splitMethodRadios.forEach((radio) => radio.addEventListener("change", updateSplitDetailsUI));
+        calculateBtn.addEventListener("click", calculateAll);
+        billsListContainer.addEventListener("click", handleBillListActions);
+        cancelEditBtn.addEventListener("click", cancelEdit);
+        copyPngBtn.addEventListener("click", copyResultsAsPng);
+        exportBtn.addEventListener("click", exportData);
+        importBtn.addEventListener("click", () => importFile.click());
+        importFile.addEventListener("change", importData);
+
+        // --- INITIALIZATION ---
+        setupAttendeeInputs();
+
+        // --- FUNCTIONS ---
+
+        // A slightly safer way to evaluate math expressions from inputs
+        function safeEval(expression) {
+          try {
+            // Restrict characters to prevent malicious code injection
+            if (/[^0-9+\-*/().\s]/.test(expression)) {
+              return NaN;
+            }
+            return Function('"use strict";return (' + expression + ")")();
+          } catch (e) {
+            return NaN;
+          }
+        }
+
+        function setupAttendeeInputs() {
+          const num = parseInt(numAttendeesInput.value, 10);
+          attendeeNamesContainer.innerHTML = "";
+          const existingNames = [...attendees];
+          attendees = [];
+
+          for (let i = 0; i < num; i++) {
+            const name = existingNames[i] || `Person ${i + 1}`;
+            attendees.push(name);
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "form-control";
+            input.placeholder = `Attendee ${i + 1} Name`;
+            input.value = name;
+            input.dataset.index = i;
+            attendeeNamesContainer.appendChild(input);
+          }
+
+          if (attendees.length > 0) {
+            billSection.style.display = "block";
+            calculationSection.style.display = "block";
+            updatePayerDropdown();
+            updateSplitDetailsUI();
+          }
+          resultsOutput.style.display = "none";
+        }
+
+        function handleAttendeeNameChange(e) {
+          if (e.target.tagName === "INPUT") {
+            const index = e.target.dataset.index;
+            attendees[index] = e.target.value.trim() || `Person ${parseInt(index, 10) + 1}`;
+            updatePayerDropdown();
+            updateSplitDetailsUI();
+            resultsOutput.style.display = "none";
+          }
+        }
+
+        function updatePayerDropdown() {
+          payerSelect.innerHTML = "";
+          attendees.forEach((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            payerSelect.appendChild(option);
+          });
+        }
+
+        function updateSplitDetailsUI() {
+          const method = document.querySelector('input[name="split-method"]:checked').value;
+          splitDetailsContainer.innerHTML = "";
+          let content = "";
+
+          switch (method) {
+            case "shares":
+              content = attendees
+                .map(
+                  (name) => `
+                    <div class="attendee-split-input">
+                        <label for="share-${name}" class="form-label">${name}'s Share</label>
+                        <input type="text" class="form-control" id="share-${name}" data-name="${name}" value="1" inputmode="decimal">
+                    </div>
+                `,
+                )
+                .join("");
+              break;
+            case "offset":
+              content = attendees
+                .map(
+                  (name) => `
+                    <div class="attendee-split-input">
+                        <label for="offset-${name}" class="form-label">${name}'s +/- Offset</label>
+                        <input type="text" class="form-control" id="offset-${name}" data-name="${name}" value="0" inputmode="decimal" placeholder="e.g., -5 or 2.50">
+                    </div>
+                `,
+                )
+                .join("");
+              break;
+            case "specific":
+              content = attendees
+                .map(
+                  (name) => `
+                    <div class="attendee-split-input">
+                        <label for="specific-${name}" class="form-label">${name}'s Amount</label>
+                        <input type="text" class="form-control" id="specific-${name}" data-name="${name}" value="0" inputmode="decimal">
+                    </div>
+                `,
+                )
+                .join("");
+              break;
+            case "even":
+            default:
+              // No extra inputs needed
+              break;
+          }
+          splitDetailsContainer.innerHTML = content;
+        }
+
+        function showError(message) {
+          errorMessage.textContent = message;
+          errorMessage.style.display = "block";
+        }
+
+        function hideError() {
+          errorMessage.style.display = "none";
+        }
+
+        function handleAddBill(e) {
+          e.preventDefault();
+          hideError();
+
+          const description = document.getElementById("bill-desc").value;
+          const amount = safeEval(document.getElementById("bill-amount").value);
+          const payer = payerSelect.value;
+          const method = document.querySelector('input[name="split-method"]:checked').value;
+
+          if (!description || isNaN(amount) || amount <= 0) {
+            showError("Please enter a valid description and a positive amount.");
+            return;
+          }
+
+          const splitData = {};
+          let validationError = null;
+
+          if (method === "shares" || method === "offset" || method === "specific") {
+            const inputs = splitDetailsContainer.querySelectorAll("input");
+            for (const input of inputs) {
+              const value = safeEval(input.value);
+              if (isNaN(value)) {
+                validationError = `Invalid math expression for ${input.dataset.name}.`;
+                break;
+              }
+              splitData[input.dataset.name] = value;
+            }
+          }
+
+          if (validationError) {
+            showError(validationError);
+            return;
+          }
+
+          if (method === "specific") {
+            const totalSpecific = Object.values(splitData).reduce((sum, val) => sum + val, 0);
+            if (Math.abs(totalSpecific - amount) > 0.01) {
+              showError(
+                `Specific amounts sum to ${totalSpecific.toFixed(2)}, but the bill total is ${amount.toFixed(2)}.`,
+              );
+              return;
+            }
+          }
+
+          if (editingBillId) {
+            // Update existing bill
+            const billIndex = bills.findIndex((b) => b.id === editingBillId);
+            if (billIndex !== -1) {
+              bills[billIndex] = {
+                id: editingBillId,
+                description,
+                amount,
+                payer,
+                split: {
+                  method,
+                  data: splitData,
+                },
+              };
+            }
+            cancelEdit();
+          } else {
+            // Add new bill
+            const bill = {
+              id: Date.now(),
+              description,
+              amount,
+              payer,
+              split: {
+                method,
+                data: splitData,
+              },
+            };
+            bills.push(bill);
+            addBillForm.reset();
+            updateSplitDetailsUI(); // Reset split details UI
+          }
+
+          renderBillsList();
+          resultsOutput.style.display = "none"; // Hide old results
+        }
+
+        function renderBillsList() {
+          if (bills.length === 0) {
+            billsListContainer.innerHTML = '<p class="text-muted">No bills added yet.</p>';
+            return;
+          }
+
+          billsListContainer.innerHTML = bills
+            .map(
+              (bill) => `
+            <div class="card mb-2">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">${bill.description}</h6>
+                        <p class="card-text mb-0">
+                            <span class="fw-bold text-success">$${bill.amount.toFixed(2)}</span>
+                            <small class="text-muted">• Paid by ${bill.payer}</small>
+                        </p>
+                    </div>
+                    <div class="bill-actions">
+                        <button class="btn btn-outline-primary btn-sm" data-action="edit" data-id="${bill.id}">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" data-action="remove" data-id="${bill.id}">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `,
+            )
+            .join("");
+        }
+
+        function handleBillListActions(e) {
+          if (e.target.closest('[data-action="remove"]')) {
+            const billId = parseInt(e.target.closest('[data-action="remove"]').dataset.id, 10);
+            bills = bills.filter((b) => b.id !== billId);
+            renderBillsList();
+            resultsOutput.style.display = "none"; // Hide old results
+          } else if (e.target.closest('[data-action="edit"]')) {
+            const billId = parseInt(e.target.closest('[data-action="edit"]').dataset.id, 10);
+            editBill(billId);
+          }
+        }
+
+        function editBill(billId) {
+          const bill = bills.find((b) => b.id === billId);
+          if (!bill) return;
+
+          editingBillId = billId;
+
+          // Populate form with bill data
+          document.getElementById("bill-desc").value = bill.description;
+          document.getElementById("bill-amount").value = bill.amount.toString();
+          payerSelect.value = bill.payer;
+
+          // Set split method
+          document.querySelector(`input[name="split-method"][value="${bill.split.method}"]`).checked = true;
+          updateSplitDetailsUI();
+
+          // Populate split data if exists
+          if (bill.split.data && Object.keys(bill.split.data).length > 0) {
+            for (const [name, value] of Object.entries(bill.split.data)) {
+              const input = splitDetailsContainer.querySelector(`input[data-name="${name}"]`);
+              if (input) {
+                input.value = value.toString();
+              }
+            }
+          }
+
+          // Update UI for edit mode
+          submitBillBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Update Bill';
+          cancelEditBtn.style.display = "inline-block";
+
+          // Scroll to form
+          billSection.scrollIntoView({ behavior: "smooth" });
+        }
+
+        function cancelEdit() {
+          editingBillId = null;
+          addBillForm.reset();
+          updateSplitDetailsUI();
+          submitBillBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Add Bill';
+          cancelEditBtn.style.display = "none";
+          hideError();
+        }
+
+        function calculateAll() {
+          if (bills.length === 0) {
+            showError("Add at least one bill before calculating.");
+            // This error appears in the bill form, let's find a better place or just alert
+            alert("Add at least one bill before calculating.");
+            return;
+          }
+
+          // 1. Initialize balances
+          const balances = {};
+          attendees.forEach((name) => {
+            balances[name] = 0;
+          });
+
+          // 2. Process each bill
+          bills.forEach((bill) => {
+            // Payer gets credited the full amount
+            balances[bill.payer] += bill.amount;
+
+            // Each person gets debited their share
+            const owedBy = {};
+            switch (bill.split.method) {
+              case "even":
+                const share = bill.amount / attendees.length;
+                attendees.forEach((name) => {
+                  owedBy[name] = share;
+                });
+                break;
+              case "shares":
+                const totalShares = Object.values(bill.split.data).reduce((sum, s) => sum + s, 0);
+                if (totalShares === 0) break; // Avoid division by zero
+                const costPerShare = bill.amount / totalShares;
+                attendees.forEach((name) => {
+                  owedBy[name] = bill.split.data[name] * costPerShare;
+                });
+                break;
+              case "offset":
+                const baseAmount = bill.amount / attendees.length;
+                attendees.forEach((name) => {
+                  owedBy[name] = baseAmount + bill.split.data[name];
+                });
+                break;
+              case "specific":
+                attendees.forEach((name) => {
+                  owedBy[name] = bill.split.data[name];
+                });
+                break;
+            }
+
+            for (const name in owedBy) {
+              balances[name] -= owedBy[name];
+            }
+          });
+
+          renderDetailedTable();
+          const payments = calculateOptimalPayments(balances);
+          renderPayments(payments);
+          resultsOutput.style.display = "block";
+        }
+
+        function renderDetailedTable() {
+          // Calculate shares per bill and totals
+          const billShares = {};
+          const totalOwed = {};
+          const totalPaid = {};
+
+          // Initialize totals
+          attendees.forEach((name) => {
+            totalOwed[name] = 0;
+            totalPaid[name] = 0;
+          });
+
+          // Process each bill
+          bills.forEach((bill) => {
+            billShares[bill.id] = {};
+
+            // Calculate what each person owes for this bill
+            const owedBy = {};
+            switch (bill.split.method) {
+              case "even":
+                const share = bill.amount / attendees.length;
+                attendees.forEach((name) => {
+                  owedBy[name] = share;
+                });
+                break;
+              case "shares":
+                const totalShares = Object.values(bill.split.data).reduce((sum, s) => sum + s, 0);
+                if (totalShares === 0) break;
+                const costPerShare = bill.amount / totalShares;
+                attendees.forEach((name) => {
+                  owedBy[name] = bill.split.data[name] * costPerShare;
+                });
+                break;
+              case "offset":
+                const baseAmount = bill.amount / attendees.length;
+                attendees.forEach((name) => {
+                  owedBy[name] = baseAmount + bill.split.data[name];
+                });
+                break;
+              case "specific":
+                attendees.forEach((name) => {
+                  owedBy[name] = bill.split.data[name];
+                });
+                break;
+            }
+
+            // Store shares and update totals
+            attendees.forEach((name) => {
+              const owed = owedBy[name] || 0;
+              billShares[bill.id][name] = owed;
+              totalOwed[name] += owed;
+
+              if (name === bill.payer) {
+                totalPaid[name] += bill.amount;
+              }
+            });
+          });
+
+          // Build table HTML with Bootstrap classes
+          let tableHTML = '<table class="table table-hover table-bordered">';
+
+          // Header row
+          tableHTML += '<thead class="table-primary"><tr><th>Bill</th>';
+          attendees.forEach((name) => {
+            tableHTML += `<th class="text-center">${name}</th>`;
+          });
+          tableHTML += "</tr></thead><tbody>";
+
+          // Bill rows
+          bills.forEach((bill) => {
+            tableHTML += `<tr>`;
+            tableHTML += `<td><strong>${bill.description}</strong><br><small class="text-muted">$${bill.amount.toFixed(2)} paid by ${bill.payer}</small></td>`;
+            attendees.forEach((name) => {
+              const share = billShares[bill.id][name] || 0;
+              tableHTML += `<td class="text-center">$${share.toFixed(2)}</td>`;
+            });
+            tableHTML += "</tr>";
+          });
+
+          // Total owed row
+          tableHTML += "<tr>";
+          tableHTML += "<td><strong>Total Owed</strong></td>";
+          attendees.forEach((name) => {
+            tableHTML += `<td class="text-center"><strong>$${totalOwed[name].toFixed(2)}</strong></td>`;
+          });
+          tableHTML += "</tr>";
+
+          // Total paid row
+          tableHTML += "<tr>";
+          tableHTML += "<td><strong>Total Paid</strong></td>";
+          attendees.forEach((name) => {
+            tableHTML += `<td class="text-center"><strong>$${totalPaid[name].toFixed(2)}</strong></td>`;
+          });
+          tableHTML += "</tr>";
+
+          // Net balance row
+          tableHTML += '<tr class="table-secondary">';
+          tableHTML += "<td><strong>Net Balance</strong></td>";
+          attendees.forEach((name) => {
+            const netBalance = totalPaid[name] - totalOwed[name];
+            const balanceClass = netBalance > 0.01 ? "text-success" : netBalance < -0.01 ? "text-danger" : "";
+            tableHTML += `<td class="text-center ${balanceClass}"><strong>$${netBalance.toFixed(2)}</strong></td>`;
+          });
+          tableHTML += "</tr>";
+
+          tableHTML += "</tbody></table>";
+
+          detailedTable.innerHTML = tableHTML;
+        }
+
+        function calculateOptimalPayments(balances) {
+          const creditors = [];
+          const debtors = [];
+
+          Object.entries(balances).forEach(([name, amount]) => {
+            if (amount > 0.01) {
+              creditors.push({ name, amount });
+            } else if (amount < -0.01) {
+              debtors.push({ name, amount: -amount }); // use positive amount for easier math
+            }
+          });
+
+          // Sort descending to handle largest amounts first
+          creditors.sort((a, b) => b.amount - a.amount);
+          debtors.sort((a, b) => b.amount - a.amount);
+
+          const payments = [];
+          let i = 0,
+            j = 0;
+          while (i < debtors.length && j < creditors.length) {
+            const debtor = debtors[i];
+            const creditor = creditors[j];
+            const paymentAmount = Math.min(debtor.amount, creditor.amount);
+
+            payments.push({
+              from: debtor.name,
+              to: creditor.name,
+              amount: paymentAmount,
+            });
+
+            debtor.amount -= paymentAmount;
+            creditor.amount -= paymentAmount;
+
+            if (Math.abs(debtor.amount) < 0.01) i++;
+            if (Math.abs(creditor.amount) < 0.01) j++;
+          }
+          return payments;
+        }
+
+        function renderPayments(payments) {
+          if (payments.length === 0) {
+            paymentsList.innerHTML =
+              '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Everyone is settled up!</div>';
+            return;
+          }
+          paymentsList.innerHTML = payments
+            .map(
+              (p) => `
+            <div class="card mb-2">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <span><strong>${p.from}</strong> pays <strong>${p.to}</strong></span>
+                    <span class="badge bg-success fs-6">$${p.amount.toFixed(2)}</span>
+                </div>
+            </div>
+        `,
+            )
+            .join("");
+        }
+
+        // Copy results area as PNG to clipboard
+        async function copyResultsAsPng() {
+          try {
+            // Show loading state
+            const originalText = copyPngBtn.innerHTML;
+            copyPngBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Generating...';
+            copyPngBtn.disabled = true;
+
+            // Get the results content element
+            const resultsContent = document.getElementById("results-content");
+
+            if (!resultsContent) {
+              throw new Error("Results content not found");
+            }
+
+            // Use html2canvas to capture the element
+            const canvas = await html2canvas(resultsContent, {
+              backgroundColor: "#ffffff",
+              scale: 2, // Higher resolution
+              useCORS: true,
+              allowTaint: true,
+              scrollX: 0,
+              scrollY: 0,
+              width: resultsContent.scrollWidth,
+              height: resultsContent.scrollHeight,
+            });
+
+            // Convert canvas to blob
+            canvas.toBlob(async (blob) => {
+              try {
+                // Check if clipboard API is available
+                if (navigator.clipboard && window.ClipboardItem) {
+                  // Copy to clipboard
+                  await navigator.clipboard.write([
+                    new ClipboardItem({
+                      "image/png": blob,
+                    }),
+                  ]);
+
+                  // Show success feedback
+                  copyPngBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Copied!';
+                  setTimeout(() => {
+                    copyPngBtn.innerHTML = originalText;
+                  }, 2000);
+                } else {
+                  // Fallback: download the image
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "bill-splitter-results.png";
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+
+                  copyPngBtn.innerHTML = '<i class="bi bi-download me-1"></i>Downloaded!';
+                  setTimeout(() => {
+                    copyPngBtn.innerHTML = originalText;
+                  }, 2000);
+                }
+              } catch (clipboardError) {
+                console.error("Clipboard error:", clipboardError);
+                // Fallback to download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "bill-splitter-results.png";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                copyPngBtn.innerHTML = '<i class="bi bi-download me-1"></i>Downloaded!';
+                setTimeout(() => {
+                  copyPngBtn.innerHTML = originalText;
+                }, 2000);
+              }
+            }, "image/png");
+          } catch (error) {
+            console.error("Error generating PNG:", error);
+            alert("Error generating PNG. Please try again.");
+          } finally {
+            // Reset button state
+            copyPngBtn.disabled = false;
+            if (copyPngBtn.innerHTML.includes("Generating...")) {
+              copyPngBtn.innerHTML = originalText;
+            }
+          }
+        }
+
+        // Export data to JSON file
+        function exportData() {
+          try {
+            const exportData = {
+              version: "1.0",
+              exportDate: new Date().toISOString(),
+              attendees: attendees,
+              bills: bills,
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: "application/json" });
+
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `bill-splitter-data-${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // Show success feedback
+            const originalText = exportBtn.innerHTML;
+            exportBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Exported!';
+            setTimeout(() => {
+              exportBtn.innerHTML = originalText;
+            }, 2000);
+          } catch (error) {
+            console.error("Export error:", error);
+            alert("Error exporting data. Please try again.");
+          }
+        }
+
+        // Import data from JSON file
+        function importData(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            try {
+              const importedData = JSON.parse(e.target.result);
+
+              // Validate the imported data structure
+              if (!importedData.attendees || !Array.isArray(importedData.attendees)) {
+                throw new Error("Invalid file format: missing or invalid attendees data");
+              }
+
+              if (!importedData.bills || !Array.isArray(importedData.bills)) {
+                throw new Error("Invalid file format: missing or invalid bills data");
+              }
+
+              // Validate attendees
+              if (importedData.attendees.length === 0) {
+                throw new Error("Invalid file: no attendees found");
+              }
+
+              // Validate bills structure
+              for (const bill of importedData.bills) {
+                if (!bill.id || !bill.description || typeof bill.amount !== "number" || !bill.payer || !bill.split) {
+                  throw new Error("Invalid file format: bill data is incomplete");
+                }
+              }
+
+              // Confirm import with user
+              const confirmMessage = `Import data with ${importedData.attendees.length} attendees and ${importedData.bills.length} bills?\n\nThis will replace all current data.`;
+              if (!confirm(confirmMessage)) {
+                return;
+              }
+
+              // Import the data
+              attendees = [...importedData.attendees];
+              bills = [...importedData.bills];
+
+              // Update the UI
+              numAttendeesInput.value = attendees.length;
+              setupAttendeeInputs();
+              renderBillsList();
+              resultsOutput.style.display = "none";
+
+              // Show success feedback
+              const originalText = importBtn.innerHTML;
+              importBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Imported!';
+              setTimeout(() => {
+                importBtn.innerHTML = originalText;
+              }, 2000);
+
+              alert(`Successfully imported ${attendees.length} attendees and ${bills.length} bills!`);
+            } catch (error) {
+              console.error("Import error:", error);
+              alert(`Error importing file: ${error.message}`);
+            }
+          };
+
+          reader.onerror = function () {
+            alert("Error reading file. Please try again.");
+          };
+
+          reader.readAsText(file);
+
+          // Reset the file input so the same file can be imported again if needed
+          event.target.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>
