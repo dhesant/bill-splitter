@@ -261,6 +261,22 @@
 
         // --- FUNCTIONS ---
 
+        // Helper function to round to 2 decimal places and handle floating point precision
+        function roundToCents(amount) {
+          return Math.round(amount * 100) / 100;
+        }
+
+        // Verify that all balances sum to zero (within floating point tolerance)
+        function verifyBalanceSum(balances) {
+          const sum = Object.values(balances).reduce((total, balance) => total + balance, 0);
+          const roundedSum = roundToCents(sum);
+          if (Math.abs(roundedSum) > 0.01) {
+            console.warn(`Balance sum verification failed: ${roundedSum}. This indicates a calculation error.`);
+            return false;
+          }
+          return true;
+        }
+
         // A slightly safer way to evaluate math expressions from inputs
         function safeEval(expression) {
           try {
@@ -272,6 +288,61 @@
           } catch (e) {
             return NaN;
           }
+        }
+
+        // DRY: Centralized bill splitting calculation logic
+        function calculateBillSplit(bill) {
+          const owedBy = {};
+
+          switch (bill.split.method) {
+            case "even":
+              const share = bill.amount / attendees.length;
+              attendees.forEach((name) => {
+                owedBy[name] = share;
+              });
+              break;
+
+            case "shares":
+              const totalShares = Object.values(bill.split.data).reduce((sum, s) => sum + s, 0);
+              if (totalShares === 0) {
+                // If no shares, split evenly as fallback
+                const evenShare = bill.amount / attendees.length;
+                attendees.forEach((name) => {
+                  owedBy[name] = evenShare;
+                });
+              } else {
+                const costPerShare = bill.amount / totalShares;
+                attendees.forEach((name) => {
+                  owedBy[name] = bill.split.data[name] * costPerShare;
+                });
+              }
+              break;
+
+            case "offset":
+              const baseAmount = bill.amount / attendees.length;
+              let totalWithOffsets = 0;
+
+              // First pass: calculate amounts with offsets
+              attendees.forEach((name) => {
+                owedBy[name] = baseAmount + bill.split.data[name];
+                totalWithOffsets += owedBy[name];
+              });
+
+              // Second pass: adjust proportionally to ensure total equals bill amount
+              const adjustmentFactor = bill.amount / totalWithOffsets;
+              attendees.forEach((name) => {
+                owedBy[name] *= adjustmentFactor;
+              });
+              break;
+
+            case "specific":
+              attendees.forEach((name) => {
+                owedBy[name] = bill.split.data[name];
+              });
+              break;
+          }
+
+          return owedBy;
         }
 
         function setupAttendeeInputs() {
@@ -424,6 +495,20 @@
             }
           }
 
+          if (method === "offset") {
+            // Check if any offset would result in negative amounts
+            const baseAmount = amount / attendees.length;
+            for (const [name, offset] of Object.entries(splitData)) {
+              const resultingAmount = baseAmount + offset;
+              if (resultingAmount < 0) {
+                showError(
+                  `${name}'s offset of ${offset.toFixed(2)} would result in a negative amount (${resultingAmount.toFixed(2)}). Please adjust the offset.`,
+                );
+                return;
+              }
+            }
+          }
+
           if (editingBillId) {
             // Update existing bill
             const billIndex = bills.findIndex((b) => b.id === editingBillId);
@@ -562,45 +647,27 @@
             balances[name] = 0;
           });
 
-          // 2. Process each bill
+          // 2. Process each bill using centralized calculation
           bills.forEach((bill) => {
             // Payer gets credited the full amount
             balances[bill.payer] += bill.amount;
 
             // Each person gets debited their share
-            const owedBy = {};
-            switch (bill.split.method) {
-              case "even":
-                const share = bill.amount / attendees.length;
-                attendees.forEach((name) => {
-                  owedBy[name] = share;
-                });
-                break;
-              case "shares":
-                const totalShares = Object.values(bill.split.data).reduce((sum, s) => sum + s, 0);
-                if (totalShares === 0) break; // Avoid division by zero
-                const costPerShare = bill.amount / totalShares;
-                attendees.forEach((name) => {
-                  owedBy[name] = bill.split.data[name] * costPerShare;
-                });
-                break;
-              case "offset":
-                const baseAmount = bill.amount / attendees.length;
-                attendees.forEach((name) => {
-                  owedBy[name] = baseAmount + bill.split.data[name];
-                });
-                break;
-              case "specific":
-                attendees.forEach((name) => {
-                  owedBy[name] = bill.split.data[name];
-                });
-                break;
-            }
-
+            const owedBy = calculateBillSplit(bill);
             for (const name in owedBy) {
               balances[name] -= owedBy[name];
             }
           });
+
+          // Apply precision rounding to all balances
+          Object.keys(balances).forEach((name) => {
+            balances[name] = roundToCents(balances[name]);
+          });
+
+          // Verify balance sum equals zero
+          if (!verifyBalanceSum(balances)) {
+            console.error("Balance verification failed - calculations may be incorrect");
+          }
 
           renderDetailedTable();
           const payments = calculateOptimalPayments(balances);
@@ -620,39 +687,12 @@
             totalPaid[name] = 0;
           });
 
-          // Process each bill
+          // Process each bill using centralized calculation
           bills.forEach((bill) => {
             billShares[bill.id] = {};
 
             // Calculate what each person owes for this bill
-            const owedBy = {};
-            switch (bill.split.method) {
-              case "even":
-                const share = bill.amount / attendees.length;
-                attendees.forEach((name) => {
-                  owedBy[name] = share;
-                });
-                break;
-              case "shares":
-                const totalShares = Object.values(bill.split.data).reduce((sum, s) => sum + s, 0);
-                if (totalShares === 0) break;
-                const costPerShare = bill.amount / totalShares;
-                attendees.forEach((name) => {
-                  owedBy[name] = bill.split.data[name] * costPerShare;
-                });
-                break;
-              case "offset":
-                const baseAmount = bill.amount / attendees.length;
-                attendees.forEach((name) => {
-                  owedBy[name] = baseAmount + bill.split.data[name];
-                });
-                break;
-              case "specific":
-                attendees.forEach((name) => {
-                  owedBy[name] = bill.split.data[name];
-                });
-                break;
-            }
+            const owedBy = calculateBillSplit(bill);
 
             // Store shares and update totals
             attendees.forEach((name) => {
